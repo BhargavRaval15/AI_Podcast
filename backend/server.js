@@ -10,9 +10,44 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const token = process.env.GITHUB_TOKEN;
-const endpoint = "https://models.github.ai/inference/chat/completions";
-const model = "openai/gpt-4.1";
+// AI Model Configuration - You can switch between different providers
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+
+// Try different AI providers in order of preference
+const AI_PROVIDERS = [
+  {
+    name: "groq",
+    endpoint: "https://api.groq.com/openai/v1/chat/completions",
+    model: "llama3-8b-8192",
+    apiKey: GROQ_API_KEY,
+    headers: (apiKey) => ({
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    }),
+  },
+  {
+    name: "github",
+    endpoint: "https://models.github.ai/inference/chat/completions",
+    model: "openai/gpt-4.1",
+    apiKey: GITHUB_TOKEN,
+    headers: (apiKey) => ({
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    }),
+  },
+  {
+    name: "openai",
+    endpoint: "https://api.openai.com/v1/chat/completions",
+    model: "gpt-3.5-turbo",
+    apiKey: OPENAI_API_KEY,
+    headers: (apiKey) => ({
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    }),
+  },
+];
 
 // 11Labs configuration
 const ELEVEN_LABS_API_KEY = process.env.ELEVEN_LABS_API_KEY;
@@ -26,23 +61,88 @@ mongoose
     console.log("Continuing without MongoDB connection");
   });
 
-app.post("/api/generate-podcast", async (req, res) => {
-  try {
-    const { topic, narratorVoiceId, hostVoiceId, guestVoiceId } = req.body;
+// Helper function to try different AI providers
+async function generateWithAI(messages) {
+  let lastError = null;
 
-    if (!topic) {
-      return res.status(400).json({ error: "Topic is required" });
+  for (const provider of AI_PROVIDERS) {
+    if (!provider.apiKey) {
+      console.log(`Skipping ${provider.name} - no API key provided`);
+      continue;
     }
 
-    console.log("Generating podcast script for topic:", topic);
+    try {
+      console.log(`Trying ${provider.name} API...`);
 
-    const response = await axios.post(
-      endpoint,
-      {
-        messages: [
-          {
-            role: "system",
-            content: `You are a professional podcast script writer. Create an engaging podcast script about the given topic.
+      const response = await axios.post(
+        provider.endpoint,
+        {
+          messages: messages,
+          model: provider.model,
+          temperature: 0.7,
+          max_tokens: 2000,
+        },
+        {
+          headers: provider.headers(provider.apiKey),
+          timeout: 30000,
+        }
+      );
+
+      console.log(`Successfully generated script using ${provider.name}`);
+      return response.data.choices[0].message.content;
+    } catch (error) {
+      lastError = error;
+      console.error(
+        `${provider.name} failed:`,
+        error.response?.status,
+        error.response?.statusText
+      );
+
+      if (error.response?.status === 401) {
+        console.error(`${provider.name} API key is invalid or expired`);
+      }
+
+      // Continue to next provider
+      continue;
+    }
+  }
+
+  // If all providers failed, throw the last error
+  throw new Error(
+    `All AI providers failed. Last error: ${
+      lastError?.response?.data?.error?.message ||
+      lastError?.message ||
+      "Unknown error"
+    }`
+  );
+}
+
+app.post("/api/generate-podcast", async (req, res) => {
+  try {
+    const {
+      topic,
+      narratorVoiceId,
+      hostVoiceId,
+      guestVoiceId,
+      scriptOverride,
+      audioOnly,
+    } = req.body;
+
+    if (!topic && !scriptOverride) {
+      return res.status(400).json({ error: "Topic or script is required" });
+    }
+
+    let script = scriptOverride;
+    let scriptParts;
+
+    // Only generate script if not provided
+    if (!scriptOverride && !audioOnly) {
+      console.log("Generating podcast script for topic:", topic);
+
+      const messages = [
+        {
+          role: "system",
+          content: `You are a professional podcast script writer. Create an engaging podcast script about the given topic.
           
           The script should have THREE distinct speakers:
           1. NARRATOR: Introduces the podcast and provides transitions between segments
@@ -50,6 +150,10 @@ app.post("/api/generate-podcast", async (req, res) => {
           3. GUEST: An expert on the topic who provides insights and perspectives
           
           Format the script clearly with speaker labels as follows:
+        [NARRATOR]: (narration text)
+        [HOST]: (host's dialogue)
+        [GUEST]: (guest's dialogue)
+        
           [NARRATOR]: (narration text)
           [HOST]: (host's dialogue)
           [GUEST]: (guest's dialogue)
@@ -58,32 +162,25 @@ app.post("/api/generate-podcast", async (req, res) => {
           followed by introducing the guest. Then proceed with a natural conversation about the topic.
           Include approximately equal speaking time for the host and guest, with occasional narrator transitions.
           End with a conclusion from all three speakers.`,
-          },
-          {
-            role: "user",
-            content: topic,
-          },
-        ],
-        temperature: 1,
-        top_p: 1,
-        model: model,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
         },
-      }
-    );
+        {
+          role: "user",
+          content: topic,
+        },
+      ];
 
-    let script = response.data.choices[0].message.content;
-    console.log("Successfully generated script");
+      // Try to generate script using available AI providers
+      script = await generateWithAI(messages);
+      console.log("Successfully generated script");
 
-    // Format the script - remove extra asterisks and clean up formatting
-    script = formatScript(script);
+      // Format the script - remove extra asterisks and clean up formatting
+      script = formatScript(script);
+    } else {
+      console.log("Using provided script for audio generation");
+    }
 
     // Parse the script into speaker parts
-    const scriptParts = parseScriptBySpeaker(script);
+    scriptParts = parseScriptBySpeaker(script || scriptOverride);
 
     try {
       // Generate audio for each speaker

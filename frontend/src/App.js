@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Container, 
-  TextField, 
-  Button, 
-  Typography, 
-  Box, 
+import React, { useState, useEffect, useRef } from "react";
+import {
+  Container,
+  TextField,
+  Button,
+  Typography,
+  Box,
   Card,
   Grid,
   IconButton,
@@ -21,20 +21,21 @@ import {
   Tab,
   Divider,
   Fade,
-  Grow
-} from '@mui/material';
-import { motion, AnimatePresence } from 'framer-motion';
-import MicIcon from '@mui/icons-material/Mic';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import PauseIcon from '@mui/icons-material/Pause';
-import PersonIcon from '@mui/icons-material/Person';
-import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
-import GroupsIcon from '@mui/icons-material/Groups';
-import EqualizerIcon from '@mui/icons-material/Equalizer';
-import axios from 'axios';
-import { Buffer } from 'buffer';
+  Grow,
+} from "@mui/material";
+import { motion, AnimatePresence } from "framer-motion";
+import MicIcon from "@mui/icons-material/Mic";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import PauseIcon from "@mui/icons-material/Pause";
+import PersonIcon from "@mui/icons-material/Person";
+import RecordVoiceOverIcon from "@mui/icons-material/RecordVoiceOver";
+import VolumeUpIcon from "@mui/icons-material/VolumeUp";
+import GroupsIcon from "@mui/icons-material/Groups";
+import EqualizerIcon from "@mui/icons-material/Equalizer";
+import axios from "axios";
+import { Buffer } from "buffer";
 
 // Background pattern SVG as base64
 const patternSvg = `data:image/svg+xml;base64,${btoa(`
@@ -50,27 +51,40 @@ const patternSvg = `data:image/svg+xml;base64,${btoa(`
 
 function App() {
   const theme = useTheme();
-  const [topic, setTopic] = useState('');
-  const [script, setScript] = useState('');
-  const [scriptParts, setScriptParts] = useState({ narrator: '', host: '', guest: '' });
+  const [topic, setTopic] = useState("");
+  const [script, setScript] = useState("");
+  const [scriptParts, setScriptParts] = useState({
+    narrator: "",
+    host: "",
+    guest: "",
+  });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [isPlaying, setIsPlaying] = useState({ narrator: false, host: false, guest: false });
+  const [audioLoading, setAudioLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [isPlaying, setIsPlaying] = useState({
+    narrator: false,
+    host: false,
+    guest: false,
+  });
   const [voices, setVoices] = useState([]);
-  
+
   // Voice selection for different speakers
-  const [narratorVoice, setNarratorVoice] = useState('');
-  const [hostVoice, setHostVoice] = useState('');
-  const [guestVoice, setGuestVoice] = useState('');
-  
+  const [narratorVoice, setNarratorVoice] = useState("");
+  const [hostVoice, setHostVoice] = useState("");
+  const [guestVoice, setGuestVoice] = useState("");
+
   // Audio URLs for different speakers
-  const [audioUrls, setAudioUrls] = useState({ narrator: '', host: '', guest: '' });
-  
+  const [audioUrls, setAudioUrls] = useState({
+    narrator: "",
+    host: "",
+    guest: "",
+  });
+
   // Audio refs for different speakers
   const narratorAudioRef = useRef(null);
   const hostAudioRef = useRef(null);
   const guestAudioRef = useRef(null);
-  
+
   // Tab state for script display
   const [currentTab, setCurrentTab] = useState(0);
 
@@ -78,112 +92,138 @@ function App() {
     // Fetch available voices
     const fetchVoices = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/voices');
-        console.log('Voices received from API:', response.data);
-        
+        const response = await axios.get("http://localhost:5000/api/voices");
+        console.log("Voices received from API:", response.data);
+
         if (response.data.voices) {
           setVoices(response.data.voices);
-          
+
           if (response.data.voices.length > 0) {
             // Set different default voices if available
             setNarratorVoice(response.data.voices[0].voice_id);
-            
+
             if (response.data.voices.length > 1) {
               setHostVoice(response.data.voices[1].voice_id);
             } else {
               setHostVoice(response.data.voices[0].voice_id);
             }
-            
+
             if (response.data.voices.length > 2) {
               setGuestVoice(response.data.voices[2].voice_id);
             } else {
               setGuestVoice(response.data.voices[0].voice_id);
             }
-            
-            console.log('Set default voices:', {
+
+            console.log("Set default voices:", {
               narrator: response.data.voices[0].voice_id,
-              host: response.data.voices.length > 1 ? response.data.voices[1].voice_id : response.data.voices[0].voice_id,
-              guest: response.data.voices.length > 2 ? response.data.voices[2].voice_id : response.data.voices[0].voice_id
+              host:
+                response.data.voices.length > 1
+                  ? response.data.voices[1].voice_id
+                  : response.data.voices[0].voice_id,
+              guest:
+                response.data.voices.length > 2
+                  ? response.data.voices[2].voice_id
+                  : response.data.voices[0].voice_id,
             });
           } else {
-            console.warn('No voices found in API response');
+            console.warn("No voices found in API response");
           }
         } else {
-          console.error('Invalid response format from voices API:', response.data);
+          console.error(
+            "Invalid response format from voices API:",
+            response.data
+          );
         }
       } catch (err) {
-        console.error('Error fetching voices:', err);
+        console.error("Error fetching voices:", err);
       }
     };
-    
+
     fetchVoices();
   }, []);
 
   const handleGenerate = async () => {
     try {
       setLoading(true);
-      setError('');
-      setScript('');
-      setScriptParts({ narrator: '', host: '', guest: '' });
-      setAudioUrls({ narrator: '', host: '', guest: '' });
+      setError("");
+      setScript("");
+      setScriptParts({ narrator: "", host: "", guest: "" });
+      setAudioUrls({ narrator: "", host: "", guest: "" });
       setIsPlaying({ narrator: false, host: false, guest: false });
-      
+
       if (!topic.trim()) {
-        setError('Please enter a topic');
+        setError("Please enter a topic");
         return;
       }
 
-      const response = await axios.post('http://localhost:5000/api/generate-podcast', { 
-        topic,
-        narratorVoiceId: narratorVoice,
-        hostVoiceId: hostVoice,
-        guestVoiceId: guestVoice
-      });
-      
+      const response = await axios.post(
+        "http://localhost:5000/api/generate-podcast",
+        {
+          topic,
+          narratorVoiceId: narratorVoice,
+          hostVoiceId: hostVoice,
+          guestVoiceId: guestVoice,
+        }
+      );
+
       setScript(response.data.script);
-      
+
       if (response.data.scriptParts) {
         setScriptParts(response.data.scriptParts);
       }
-      
+
       // Handle audio generation or error
       if (response.data.audioError) {
         // Audio failed but we still have a script
-        setError(response.data.audioError + '. Script generated successfully.');
+        setError(response.data.audioError + ". Script generated successfully.");
       } else if (response.data.audio) {
         try {
           const newAudioUrls = {};
-          
+
           // Process narrator audio
           if (response.data.audio.narrator) {
-            const narratorBlob = new Blob([Buffer.from(response.data.audio.narrator, 'base64')], { type: 'audio/mpeg' });
+            const narratorBlob = new Blob(
+              [Buffer.from(response.data.audio.narrator, "base64")],
+              { type: "audio/mpeg" }
+            );
             newAudioUrls.narrator = URL.createObjectURL(narratorBlob);
           }
-          
+
           // Process host audio
           if (response.data.audio.host) {
-            const hostBlob = new Blob([Buffer.from(response.data.audio.host, 'base64')], { type: 'audio/mpeg' });
+            const hostBlob = new Blob(
+              [Buffer.from(response.data.audio.host, "base64")],
+              { type: "audio/mpeg" }
+            );
             newAudioUrls.host = URL.createObjectURL(hostBlob);
           }
-          
+
           // Process guest audio
           if (response.data.audio.guest) {
-            const guestBlob = new Blob([Buffer.from(response.data.audio.guest, 'base64')], { type: 'audio/mpeg' });
+            const guestBlob = new Blob(
+              [Buffer.from(response.data.audio.guest, "base64")],
+              { type: "audio/mpeg" }
+            );
             newAudioUrls.guest = URL.createObjectURL(guestBlob);
           }
-          
+
           setAudioUrls(newAudioUrls);
         } catch (audioErr) {
-          console.error('Error processing audio:', audioErr);
-          setError('Audio could not be processed. Script generated successfully.');
+          console.error("Error processing audio:", audioErr);
+          setError(
+            "Audio could not be processed. Script generated successfully."
+          );
         }
       } else {
-        setError('Unknown response format. Script generated successfully.');
+        setError("Unknown response format. Script generated successfully.");
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.details || err.message || 'Failed to generate podcast script. Please try again.';
+      const errorMessage =
+        err.response?.data?.details ||
+        err.message ||
+        "Failed to generate podcast script. Please try again.";
       setError(errorMessage);
-      console.error('Error:', err);
+      console.error("Error:", err);
     } finally {
       setLoading(false);
     }
@@ -197,40 +237,118 @@ function App() {
     handleGenerate();
   };
 
+  const generateAudio = async () => {
+    if (!script || !scriptParts) {
+      setError("Please generate a script first");
+      return;
+    }
+
+    setAudioLoading(true);
+    setError("");
+
+    try {
+      console.log("Generating audio for existing script...");
+
+      const response = await axios.post(
+        "http://localhost:5000/api/generate-podcast",
+        {
+          topic: topic || "Generated Script",
+          scriptOverride: script, // Send the existing script
+          narratorVoiceId: narratorVoice,
+          hostVoiceId: hostVoice,
+          guestVoiceId: guestVoice,
+          audioOnly: true, // Flag to indicate we only want audio generation
+        }
+      );
+
+      if (response.data) {
+        // Process audio data
+        const newAudioUrls = { narrator: "", host: "", guest: "" };
+
+        if (response.data.audio?.narrator) {
+          const narratorBlob = new Blob(
+            [Buffer.from(response.data.audio.narrator, "base64")],
+            { type: "audio/mpeg" }
+          );
+          newAudioUrls.narrator = URL.createObjectURL(narratorBlob);
+        }
+
+        if (response.data.audio?.host) {
+          const hostBlob = new Blob(
+            [Buffer.from(response.data.audio.host, "base64")],
+            { type: "audio/mpeg" }
+          );
+          newAudioUrls.host = URL.createObjectURL(hostBlob);
+        }
+
+        if (response.data.audio?.guest) {
+          const guestBlob = new Blob(
+            [Buffer.from(response.data.audio.guest, "base64")],
+            { type: "audio/mpeg" }
+          );
+          newAudioUrls.guest = URL.createObjectURL(guestBlob);
+        }
+
+        setAudioUrls(newAudioUrls);
+        console.log("Audio generated successfully:", newAudioUrls);
+
+        if (response.data.audioError) {
+          setError(`Audio generation warning: ${response.data.audioError}`);
+        }
+      }
+    } catch (err) {
+      const errorMessage =
+        err.response?.data?.details ||
+        err.message ||
+        "Failed to generate audio. Please check your API keys.";
+      setError(errorMessage);
+      console.error("Audio generation error:", err);
+    } finally {
+      setAudioLoading(false);
+    }
+  };
+
   const handlePlayPause = (speaker) => {
-    const audioRef = 
-      speaker === 'narrator' ? narratorAudioRef.current :
-      speaker === 'host' ? hostAudioRef.current :
-      speaker === 'guest' ? guestAudioRef.current : null;
-    
+    const audioRef =
+      speaker === "narrator"
+        ? narratorAudioRef.current
+        : speaker === "host"
+        ? hostAudioRef.current
+        : speaker === "guest"
+        ? guestAudioRef.current
+        : null;
+
     if (audioRef) {
       if (isPlaying[speaker]) {
         audioRef.pause();
       } else {
         // Pause all other audio first
-        if (narratorAudioRef.current && speaker !== 'narrator') narratorAudioRef.current.pause();
-        if (hostAudioRef.current && speaker !== 'host') hostAudioRef.current.pause();
-        if (guestAudioRef.current && speaker !== 'guest') guestAudioRef.current.pause();
-        
+        if (narratorAudioRef.current && speaker !== "narrator")
+          narratorAudioRef.current.pause();
+        if (hostAudioRef.current && speaker !== "host")
+          hostAudioRef.current.pause();
+        if (guestAudioRef.current && speaker !== "guest")
+          guestAudioRef.current.pause();
+
         // Update all playing states
-        setIsPlaying(prev => ({
-          narrator: speaker === 'narrator' ? true : false,
-          host: speaker === 'host' ? true : false,
-          guest: speaker === 'guest' ? true : false
+        setIsPlaying((prev) => ({
+          narrator: speaker === "narrator" ? true : false,
+          host: speaker === "host" ? true : false,
+          guest: speaker === "guest" ? true : false,
         }));
-        
+
         audioRef.play();
       }
     }
   };
-  
+
   const handleAudioEnded = (speaker) => {
-    setIsPlaying(prev => ({
+    setIsPlaying((prev) => ({
       ...prev,
-      [speaker]: false
+      [speaker]: false,
     }));
   };
-  
+
   const handleTabChange = (event, newValue) => {
     setCurrentTab(newValue);
   };
@@ -241,51 +359,51 @@ function App() {
     if (narratorAudioRef.current) narratorAudioRef.current.pause();
     if (hostAudioRef.current) hostAudioRef.current.pause();
     if (guestAudioRef.current) guestAudioRef.current.pause();
-    
+
     // Reset playing states
     setIsPlaying({
       narrator: false,
       host: false,
-      guest: false
+      guest: false,
     });
-    
+
     // Play narrator first if available
     if (narratorAudioRef.current && audioUrls.narrator) {
-      setIsPlaying(prev => ({ ...prev, narrator: true }));
+      setIsPlaying((prev) => ({ ...prev, narrator: true }));
       narratorAudioRef.current.play();
-      
+
       // Wait for narrator to finish
-      await new Promise(resolve => {
+      await new Promise((resolve) => {
         narratorAudioRef.current.onended = resolve;
       });
-      
-      setIsPlaying(prev => ({ ...prev, narrator: false }));
+
+      setIsPlaying((prev) => ({ ...prev, narrator: false }));
     }
-    
+
     // Then play host if available
     if (hostAudioRef.current && audioUrls.host) {
-      setIsPlaying(prev => ({ ...prev, host: true }));
+      setIsPlaying((prev) => ({ ...prev, host: true }));
       hostAudioRef.current.play();
-      
+
       // Wait for host to finish
-      await new Promise(resolve => {
+      await new Promise((resolve) => {
         hostAudioRef.current.onended = resolve;
       });
-      
-      setIsPlaying(prev => ({ ...prev, host: false }));
+
+      setIsPlaying((prev) => ({ ...prev, host: false }));
     }
-    
+
     // Finally play guest if available
     if (guestAudioRef.current && audioUrls.guest) {
-      setIsPlaying(prev => ({ ...prev, guest: true }));
+      setIsPlaying((prev) => ({ ...prev, guest: true }));
       guestAudioRef.current.play();
-      
+
       // Wait for guest to finish
-      await new Promise(resolve => {
+      await new Promise((resolve) => {
         guestAudioRef.current.onended = resolve;
       });
-      
-      setIsPlaying(prev => ({ ...prev, guest: false }));
+
+      setIsPlaying((prev) => ({ ...prev, guest: false }));
     }
   };
 
@@ -296,74 +414,82 @@ function App() {
       if (narratorAudioRef.current) narratorAudioRef.current.pause();
       if (hostAudioRef.current) hostAudioRef.current.pause();
       if (guestAudioRef.current) guestAudioRef.current.pause();
-      
+
       // Reset playing states
       setIsPlaying({
         narrator: false,
         host: false,
-        guest: false
+        guest: false,
       });
-      
+
       // Parse the full script into sections by speaker
       const sections = parseScriptIntoSections(script);
-      
+
       // Setting up audio context
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       const audioContext = new AudioContext();
-      
+
       // For each section, we need to:
       // 1. Decode the audio for that speaker
       // 2. Identify the part of the audio to play (based on text match)
       // 3. Play that part
-      
+
       // Function to create a better text match by removing special characters
       const normalizeText = (text) => {
-        return text.toLowerCase()
+        return text
+          .toLowerCase()
           .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "")
           .replace(/\s{2,}/g, " ")
           .trim();
       };
-      
+
       // Set initial tab to full script
       setCurrentTab(0);
-      
+
       // For tracking our progress
       let currentSectionIndex = 0;
       const totalSections = sections.length;
-      
+
       // Play each section
       for (const section of sections) {
         currentSectionIndex++;
-        console.log(`Playing section ${currentSectionIndex}/${totalSections}:`, section);
-        
+        console.log(
+          `Playing section ${currentSectionIndex}/${totalSections}:`,
+          section
+        );
+
         // Skip sections with no audio
         if (!audioUrls[section.speaker]) {
           console.log(`No audio available for ${section.speaker}, skipping`);
           continue;
         }
-        
+
         // Get the right audio reference
-        const audioRef = 
-          section.speaker === 'narrator' ? narratorAudioRef.current :
-          section.speaker === 'host' ? hostAudioRef.current :
-          section.speaker === 'guest' ? guestAudioRef.current : null;
-        
+        const audioRef =
+          section.speaker === "narrator"
+            ? narratorAudioRef.current
+            : section.speaker === "host"
+            ? hostAudioRef.current
+            : section.speaker === "guest"
+            ? guestAudioRef.current
+            : null;
+
         if (audioRef) {
           // Update UI to show which voice is playing
-          setIsPlaying(prev => ({
+          setIsPlaying((prev) => ({
             ...prev,
-            [section.speaker]: true
+            [section.speaker]: true,
           }));
-          
+
           // Update the currently displayed tab
           setCurrentTab(0); // Full script view
-          
+
           // Play the audio
           audioRef.play();
-          
+
           // Update UI with highlighted section
           // This would ideally highlight the current part being spoken
-          
+
           // Wait for this section to finish
           await new Promise((resolve) => {
             // Set a timeout based on audio duration or estimated time
@@ -372,31 +498,33 @@ function App() {
               section.text.length * 75, // 75ms per character
               audioRef.duration * 1000 || 10000 // use actual duration if available, or 10s max
             );
-            
-            console.log(`Estimated duration for section: ${estimatedDuration}ms`);
-            
+
+            console.log(
+              `Estimated duration for section: ${estimatedDuration}ms`
+            );
+
             // Stop after the estimated time
             setTimeout(resolve, estimatedDuration);
           });
-          
+
           // Pause this audio before moving to next section
           audioRef.pause();
-          
+
           // Reset playing state for this speaker
-          setIsPlaying(prev => ({
+          setIsPlaying((prev) => ({
             ...prev,
-            [section.speaker]: false
+            [section.speaker]: false,
           }));
         }
       }
-      
+
       // All done - reset states
       setIsPlaying({
         narrator: false,
         host: false,
-        guest: false
+        guest: false,
       });
-      
+
       // Return to full script view
       setCurrentTab(0);
     } catch (error) {
@@ -405,7 +533,7 @@ function App() {
       setIsPlaying({
         narrator: false,
         host: false,
-        guest: false
+        guest: false,
       });
     }
   };
@@ -413,58 +541,62 @@ function App() {
   // Function to parse full script into sections by speaker
   const parseScriptIntoSections = (fullScript) => {
     const sections = [];
-    const lines = fullScript.split('\n');
+    const lines = fullScript.split("\n");
     let currentSpeaker = null;
     let currentSection = null;
-    
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-      
+
       // Skip empty lines
-      if (line === '') continue;
-      
+      if (line === "") continue;
+
       // Check for speaker labels
       if (line.match(/^\[NARRATOR\]:/i) || line.match(/^NARRATOR:/i)) {
         // Extract content after the label
-        const content = line.replace(/^\[NARRATOR\]:\s*/i, '').replace(/^NARRATOR:\s*/i, '');
-        currentSpeaker = 'narrator';
-        currentSection = { speaker: 'narrator', text: content };
+        const content = line
+          .replace(/^\[NARRATOR\]:\s*/i, "")
+          .replace(/^NARRATOR:\s*/i, "");
+        currentSpeaker = "narrator";
+        currentSection = { speaker: "narrator", text: content };
         sections.push(currentSection);
-      } 
-      else if (line.match(/^\[HOST\]:/i) || line.match(/^HOST:/i)) {
-        const content = line.replace(/^\[HOST\]:\s*/i, '').replace(/^HOST:\s*/i, '');
-        currentSpeaker = 'host';
-        currentSection = { speaker: 'host', text: content };
+      } else if (line.match(/^\[HOST\]:/i) || line.match(/^HOST:/i)) {
+        const content = line
+          .replace(/^\[HOST\]:\s*/i, "")
+          .replace(/^HOST:\s*/i, "");
+        currentSpeaker = "host";
+        currentSection = { speaker: "host", text: content };
         sections.push(currentSection);
-      } 
-      else if (line.match(/^\[GUEST\]:/i) || line.match(/^GUEST:/i)) {
-        const content = line.replace(/^\[GUEST\]:\s*/i, '').replace(/^GUEST:\s*/i, '');
-        currentSpeaker = 'guest';
-        currentSection = { speaker: 'guest', text: content };
+      } else if (line.match(/^\[GUEST\]:/i) || line.match(/^GUEST:/i)) {
+        const content = line
+          .replace(/^\[GUEST\]:\s*/i, "")
+          .replace(/^GUEST:\s*/i, "");
+        currentSpeaker = "guest";
+        currentSection = { speaker: "guest", text: content };
         sections.push(currentSection);
       }
       // If no speaker label but we have a current speaker, add to their section
       else if (currentSpeaker && currentSection) {
         // Add to the text of current section
-        currentSection.text += '\n' + line;
+        currentSection.text += "\n" + line;
       }
       // If there's no speaker label yet but it's not empty, assume narrator
       else if (!currentSpeaker && line) {
-        currentSpeaker = 'narrator';
-        currentSection = { speaker: 'narrator', text: line };
+        currentSpeaker = "narrator";
+        currentSection = { speaker: "narrator", text: line };
         sections.push(currentSection);
       }
     }
-    
-    console.log('Parsed sections:', sections);
+
+    console.log("Parsed sections:", sections);
     return sections;
   };
 
   return (
     <Box
       sx={{
-        minHeight: '100vh',
-        position: 'relative',
+        minHeight: "100vh",
+        position: "relative",
         background: `
           linear-gradient(135deg, 
             rgba(10, 12, 25, 1) 0%, 
@@ -474,32 +606,35 @@ function App() {
           )
         `,
         py: 4,
-        '&::before': {
+        "&::before": {
           content: '""',
-          position: 'absolute',
+          position: "absolute",
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
           backgroundImage: `url(${patternSvg})`,
-          backgroundRepeat: 'repeat',
+          backgroundRepeat: "repeat",
           opacity: 0.4,
-          zIndex: 0
+          zIndex: 0,
         },
-        '&::after': {
+        "&::after": {
           content: '""',
-          position: 'absolute',
-          top: '10%',
-          right: '5%',
-          width: '40vw',
-          height: '40vw',
-          maxWidth: '600px',
-          maxHeight: '600px',
-          backgroundColor: 'transparent',
-          backgroundImage: `radial-gradient(circle at center, ${alpha(theme.palette.primary.main, 0.2)} 0%, ${alpha(theme.palette.primary.main, 0)} 70%)`,
-          filter: 'blur(50px)',
-          zIndex: 0
-        }
+          position: "absolute",
+          top: "10%",
+          right: "5%",
+          width: "40vw",
+          height: "40vw",
+          maxWidth: "600px",
+          maxHeight: "600px",
+          backgroundColor: "transparent",
+          backgroundImage: `radial-gradient(circle at center, ${alpha(
+            theme.palette.primary.main,
+            0.2
+          )} 0%, ${alpha(theme.palette.primary.main, 0)} 70%)`,
+          filter: "blur(50px)",
+          zIndex: 0,
+        },
       }}
     >
       {/* Floating particles */}
@@ -508,18 +643,26 @@ function App() {
           key={`particle-${index}`}
           component={motion.div}
           sx={{
-            position: 'absolute',
-            width: index % 3 === 0 ? '12px' : index % 3 === 1 ? '8px' : '6px',
-            height: index % 3 === 0 ? '12px' : index % 3 === 1 ? '8px' : '6px',
-            borderRadius: '50%',
-            background: index % 4 === 0 ? alpha(theme.palette.primary.main, 0.5) :
-                       index % 4 === 1 ? alpha(theme.palette.secondary.main, 0.5) :
-                       index % 4 === 2 ? alpha(theme.palette.info.main, 0.5) :
-                       alpha(theme.palette.success.main, 0.5),
-            boxShadow: index % 4 === 0 ? `0 0 15px ${alpha(theme.palette.primary.main, 0.7)}` :
-                       index % 4 === 1 ? `0 0 15px ${alpha(theme.palette.secondary.main, 0.7)}` :
-                       index % 4 === 2 ? `0 0 15px ${alpha(theme.palette.info.main, 0.7)}` :
-                       `0 0 15px ${alpha(theme.palette.success.main, 0.7)}`,
+            position: "absolute",
+            width: index % 3 === 0 ? "12px" : index % 3 === 1 ? "8px" : "6px",
+            height: index % 3 === 0 ? "12px" : index % 3 === 1 ? "8px" : "6px",
+            borderRadius: "50%",
+            background:
+              index % 4 === 0
+                ? alpha(theme.palette.primary.main, 0.5)
+                : index % 4 === 1
+                ? alpha(theme.palette.secondary.main, 0.5)
+                : index % 4 === 2
+                ? alpha(theme.palette.info.main, 0.5)
+                : alpha(theme.palette.success.main, 0.5),
+            boxShadow:
+              index % 4 === 0
+                ? `0 0 15px ${alpha(theme.palette.primary.main, 0.7)}`
+                : index % 4 === 1
+                ? `0 0 15px ${alpha(theme.palette.secondary.main, 0.7)}`
+                : index % 4 === 2
+                ? `0 0 15px ${alpha(theme.palette.info.main, 0.7)}`
+                : `0 0 15px ${alpha(theme.palette.success.main, 0.7)}`,
             zIndex: 0,
           }}
           animate={{
@@ -536,88 +679,94 @@ function App() {
             delay: index * 0.5,
           }}
           style={{
-            top: `${10 + (index * 6)}%`,
-            left: index % 2 === 0 ? `${5 + (index * 7)}%` : `${85 - (index * 7)}%`,
+            top: `${10 + index * 6}%`,
+            left: index % 2 === 0 ? `${5 + index * 7}%` : `${85 - index * 7}%`,
           }}
         />
       ))}
 
-      <Container maxWidth="md" sx={{ position: 'relative', zIndex: 1 }}>
+      <Container maxWidth="md" sx={{ position: "relative", zIndex: 1 }}>
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
-          <Typography 
-            variant="h3" 
-            component="h1" 
-            gutterBottom 
-            align="center" 
+          <Typography
+            variant="h3"
+            component="h1"
+            gutterBottom
+            align="center"
             color="primary"
             sx={{
-              fontWeight: 'bold',
-              textShadow: '0 0 10px rgba(79, 106, 245, 0.5)',
+              fontWeight: "bold",
+              textShadow: "0 0 10px rgba(79, 106, 245, 0.5)",
               mb: 4,
-              position: 'relative',
-              '&::after': {
+              position: "relative",
+              "&::after": {
                 content: '""',
-                position: 'absolute',
-                bottom: '-10px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                width: '80px',
-                height: '3px',
+                position: "absolute",
+                bottom: "-10px",
+                left: "50%",
+                transform: "translateX(-50%)",
+                width: "80px",
+                height: "3px",
                 background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                borderRadius: '10px',
-                boxShadow: '0 0 8px rgba(107, 72, 255, 0.6)'
-              }
+                borderRadius: "10px",
+                boxShadow: "0 0 8px rgba(107, 72, 255, 0.6)",
+              },
             }}
           >
             AI Podcast Generator
           </Typography>
         </motion.div>
-          
+
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, delay: 0.2 }}
         >
-          <Card 
-            elevation={3} 
-            sx={{ 
-              p: 4, 
+          <Card
+            elevation={3}
+            sx={{
+              p: 4,
               borderRadius: 2,
-              background: 'rgba(20, 24, 36, 0.7)',
-              backdropFilter: 'blur(10px)',
-              transition: 'all 0.3s ease-in-out',
-              position: 'relative',
-              overflow: 'hidden',
+              background: "rgba(20, 24, 36, 0.7)",
+              backdropFilter: "blur(10px)",
+              transition: "all 0.3s ease-in-out",
+              position: "relative",
+              overflow: "hidden",
               border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-              '&:hover': {
-                boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.2)}`
+              "&:hover": {
+                boxShadow: `0 8px 32px ${alpha(
+                  theme.palette.primary.main,
+                  0.2
+                )}`,
               },
-              '&::before': {
+              "&::before": {
                 content: '""',
-                position: 'absolute',
+                position: "absolute",
                 top: 0,
                 left: 0,
-                width: '100%',
-                height: '4px',
+                width: "100%",
+                height: "4px",
                 background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
               },
-              '&::after': {
+              "&::after": {
                 content: '""',
-                position: 'absolute',
+                position: "absolute",
                 bottom: 0,
                 right: 0,
-                width: '150px',
-                height: '150px',
-                background: `radial-gradient(circle at center, ${alpha(theme.palette.primary.main, 0.15)} 0%, transparent 70%)`,
-                borderRadius: '50%',
+                width: "150px",
+                height: "150px",
+                background: `radial-gradient(circle at center, ${alpha(
+                  theme.palette.primary.main,
+                  0.15
+                )} 0%, transparent 70%)`,
+                borderRadius: "50%",
                 zIndex: 0,
                 opacity: 0.5,
-                transform: 'translate(30%, 30%)',
-              }
+                transform: "translate(30%, 30%)",
+              },
             }}
           >
             <Grid container spacing={3}>
@@ -633,69 +782,88 @@ function App() {
                     value={topic}
                     onChange={(e) => setTopic(e.target.value)}
                     error={!!error && !loading}
-                    helperText={error && !loading ? error : ''}
+                    helperText={error && !loading ? error : ""}
                     multiline
                     rows={3}
                     InputProps={{
                       startAdornment: (
-                        <MicIcon sx={{ mr: 1, color: 'primary.main', fontSize: '1.5rem', mt: 1 }} />
+                        <MicIcon
+                          sx={{
+                            mr: 1,
+                            color: "primary.main",
+                            fontSize: "1.5rem",
+                            mt: 1,
+                          }}
+                        />
                       ),
                       sx: {
-                        fontSize: '1.2rem',
+                        fontSize: "1.2rem",
                         py: 1,
-                        '& .MuiOutlinedInput-notchedOutline': {
-                          borderWidth: '2px'
+                        "& .MuiOutlinedInput-notchedOutline": {
+                          borderWidth: "2px",
                         },
-                        '&:hover .MuiOutlinedInput-notchedOutline': {
-                          borderWidth: '2px'
-                        }
-                      }
+                        "&:hover .MuiOutlinedInput-notchedOutline": {
+                          borderWidth: "2px",
+                        },
+                      },
                     }}
                     InputLabelProps={{
                       sx: {
-                        fontSize: '1.2rem'
-                      }
+                        fontSize: "1.2rem",
+                      },
                     }}
                     sx={{
-                      '& .MuiFormHelperText-root': {
-                        fontSize: '0.9rem'
+                      "& .MuiFormHelperText-root": {
+                        fontSize: "0.9rem",
                       },
-                      mb: 1
+                      mb: 1,
                     }}
                   />
                 </motion.div>
               </Grid>
 
               <Grid item xs={12}>
-                <Typography variant="h6" gutterBottom
-                  sx={{ 
-                    position: 'relative',
-                    '&:after': {
+                <Typography
+                  variant="h6"
+                  gutterBottom
+                  sx={{
+                    position: "relative",
+                    "&:after": {
                       content: '""',
-                      position: 'absolute',
-                      bottom: '-4px',
+                      position: "absolute",
+                      bottom: "-4px",
                       left: 0,
-                      width: '40px',
-                      height: '2px',
-                      background: theme.palette.primary.main
-                    }
+                      width: "40px",
+                      height: "2px",
+                      background: theme.palette.primary.main,
+                    },
                   }}
                 >
                   Voice Selection
                 </Typography>
                 <Grid container spacing={2}>
                   <Grid item xs={12} md={4}>
-                    <motion.div whileHover={{ y: -5 }} transition={{ type: "spring", stiffness: 300 }}>
+                    <motion.div
+                      whileHover={{ y: -5 }}
+                      transition={{ type: "spring", stiffness: 300 }}
+                    >
                       <FormControl fullWidth>
                         <InputLabel>Narrator Voice</InputLabel>
                         <Select
                           value={narratorVoice}
                           label="Narrator Voice"
                           onChange={(e) => setNarratorVoice(e.target.value)}
-                          startAdornment={<RecordVoiceOverIcon sx={{ mr: 1, color: 'text.secondary' }} />}
+                          startAdornment={
+                            <RecordVoiceOverIcon
+                              sx={{ mr: 1, color: "text.secondary" }}
+                            />
+                          }
                         >
                           {voices.map((voice) => (
-                            <MenuItem key={`narrator-${voice.voice_id}`} value={voice.voice_id}>
+                            <MenuItem
+                              key={`narrator-${voice.voice_id}`}
+                              value={voice.voice_id}
+                            >
                               {voice.name}
                             </MenuItem>
                           ))}
@@ -704,17 +872,31 @@ function App() {
                     </motion.div>
                   </Grid>
                   <Grid item xs={12} md={4}>
-                    <motion.div whileHover={{ y: -5 }} transition={{ type: "spring", stiffness: 300, delay: 0.05 }}>
+                    <motion.div
+                      whileHover={{ y: -5 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 300,
+                        delay: 0.05,
+                      }}
+                    >
                       <FormControl fullWidth>
                         <InputLabel>Host Voice</InputLabel>
                         <Select
                           value={hostVoice}
                           label="Host Voice"
                           onChange={(e) => setHostVoice(e.target.value)}
-                          startAdornment={<PersonIcon sx={{ mr: 1, color: 'text.secondary' }} />}
+                          startAdornment={
+                            <PersonIcon
+                              sx={{ mr: 1, color: "text.secondary" }}
+                            />
+                          }
                         >
                           {voices.map((voice) => (
-                            <MenuItem key={`host-${voice.voice_id}`} value={voice.voice_id}>
+                            <MenuItem
+                              key={`host-${voice.voice_id}`}
+                              value={voice.voice_id}
+                            >
                               {voice.name}
                             </MenuItem>
                           ))}
@@ -723,17 +905,31 @@ function App() {
                     </motion.div>
                   </Grid>
                   <Grid item xs={12} md={4}>
-                    <motion.div whileHover={{ y: -5 }} transition={{ type: "spring", stiffness: 300, delay: 0.1 }}>
+                    <motion.div
+                      whileHover={{ y: -5 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 300,
+                        delay: 0.1,
+                      }}
+                    >
                       <FormControl fullWidth>
                         <InputLabel>Guest Voice</InputLabel>
                         <Select
                           value={guestVoice}
                           label="Guest Voice"
                           onChange={(e) => setGuestVoice(e.target.value)}
-                          startAdornment={<GroupsIcon sx={{ mr: 1, color: 'text.secondary' }} />}
+                          startAdornment={
+                            <GroupsIcon
+                              sx={{ mr: 1, color: "text.secondary" }}
+                            />
+                          }
                         >
                           {voices.map((voice) => (
-                            <MenuItem key={`guest-${voice.voice_id}`} value={voice.voice_id}>
+                            <MenuItem
+                              key={`guest-${voice.voice_id}`}
+                              value={voice.voice_id}
+                            >
                               {voice.name}
                             </MenuItem>
                           ))}
@@ -743,7 +939,7 @@ function App() {
                   </Grid>
                 </Grid>
               </Grid>
-              
+
               <Grid item xs={12}>
                 <motion.div
                   whileHover={{ scale: 1.03 }}
@@ -759,54 +955,69 @@ function App() {
                       py: 1.5,
                       borderRadius: 2,
                       background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                      boxShadow: `0 8px 16px ${alpha(theme.palette.primary.main, 0.25)}`,
-                      position: 'relative',
-                      overflow: 'hidden',
-                      transition: 'all 0.3s ease',
-                      '&::before': {
+                      boxShadow: `0 8px 16px ${alpha(
+                        theme.palette.primary.main,
+                        0.25
+                      )}`,
+                      position: "relative",
+                      overflow: "hidden",
+                      transition: "all 0.3s ease",
+                      "&::before": {
                         content: '""',
-                        position: 'absolute',
+                        position: "absolute",
                         top: 0,
-                        left: '-100%',
-                        width: '100%',
-                        height: '100%',
-                        background: `linear-gradient(90deg, transparent, ${alpha(theme.palette.common.white, 0.2)}, transparent)`,
-                        transition: 'all 0.6s ease',
+                        left: "-100%",
+                        width: "100%",
+                        height: "100%",
+                        background: `linear-gradient(90deg, transparent, ${alpha(
+                          theme.palette.common.white,
+                          0.2
+                        )}, transparent)`,
+                        transition: "all 0.6s ease",
                       },
-                      '&:hover': {
-                        transform: 'translateY(-2px)',
-                        boxShadow: `0 12px 20px ${alpha(theme.palette.primary.main, 0.3)}`,
-                        '&::before': {
-                          left: '100%',
-                        }
+                      "&:hover": {
+                        transform: "translateY(-2px)",
+                        boxShadow: `0 12px 20px ${alpha(
+                          theme.palette.primary.main,
+                          0.3
+                        )}`,
+                        "&::before": {
+                          left: "100%",
+                        },
                       },
-                      '&::after': {
+                      "&::after": {
                         content: '""',
-                        position: 'absolute',
-                        top: '5px',
-                        left: '5px',
-                        right: '5px',
-                        bottom: '5px',
-                        borderRadius: '8px',
-                        border: `1px solid ${alpha(theme.palette.common.white, 0.15)}`,
-                        pointerEvents: 'none'
-                      }
+                        position: "absolute",
+                        top: "5px",
+                        left: "5px",
+                        right: "5px",
+                        bottom: "5px",
+                        borderRadius: "8px",
+                        border: `1px solid ${alpha(
+                          theme.palette.common.white,
+                          0.15
+                        )}`,
+                        pointerEvents: "none",
+                      },
                     }}
                   >
                     {loading ? (
                       <CircularProgress size={24} color="inherit" />
                     ) : (
                       <>
-                        <Box component="span" sx={{ mr: 1, display: 'inline-flex' }}>
+                        <Box
+                          component="span"
+                          sx={{ mr: 1, display: "inline-flex" }}
+                        >
                           <motion.div
-                            animate={{ 
+                            animate={{
                               rotate: [0, 180, 360],
-                              scale: [1, 1.2, 1]
+                              scale: [1, 1.2, 1],
                             }}
-                            transition={{ 
+                            transition={{
                               duration: 2,
                               repeat: Infinity,
-                              ease: "easeInOut"
+                              ease: "easeInOut",
                             }}
                           >
                             <EqualizerIcon fontSize="small" />
@@ -845,95 +1056,166 @@ function App() {
                       exit={{ opacity: 0, y: 20 }}
                       transition={{ duration: 0.5 }}
                     >
-                      <Card 
-                        elevation={2} 
-                        sx={{ 
-                          p: 3, 
+                      <Card
+                        elevation={2}
+                        sx={{
+                          p: 3,
                           borderRadius: 2,
-                          bgcolor: 'background.paper',
-                          transition: 'all 0.3s ease',
-                          position: 'relative',
-                          border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-                          background: `linear-gradient(135deg, ${alpha('#0d101f', 0.9)} 0%, ${alpha('#1a1f35', 0.95)} 100%)`,
-                          '&:hover': {
-                            boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.2)}`
+                          bgcolor: "background.paper",
+                          transition: "all 0.3s ease",
+                          position: "relative",
+                          border: `1px solid ${alpha(
+                            theme.palette.primary.main,
+                            0.2
+                          )}`,
+                          background: `linear-gradient(135deg, ${alpha(
+                            "#0d101f",
+                            0.9
+                          )} 0%, ${alpha("#1a1f35", 0.95)} 100%)`,
+                          "&:hover": {
+                            boxShadow: `0 8px 24px ${alpha(
+                              theme.palette.primary.main,
+                              0.2
+                            )}`,
                           },
-                          '&::before': {
+                          "&::before": {
                             content: '""',
-                            position: 'absolute',
-                            top: '10px',
-                            right: '10px',
-                            width: '60px',
-                            height: '60px',
-                            borderRight: `2px solid ${alpha(theme.palette.primary.main, 0.4)}`,
-                            borderTop: `2px solid ${alpha(theme.palette.primary.main, 0.4)}`,
-                            borderRadius: '0 12px 0 0',
-                            opacity: 0.8
+                            position: "absolute",
+                            top: "10px",
+                            right: "10px",
+                            width: "60px",
+                            height: "60px",
+                            borderRight: `2px solid ${alpha(
+                              theme.palette.primary.main,
+                              0.4
+                            )}`,
+                            borderTop: `2px solid ${alpha(
+                              theme.palette.primary.main,
+                              0.4
+                            )}`,
+                            borderRadius: "0 12px 0 0",
+                            opacity: 0.8,
                           },
-                          '&::after': {
+                          "&::after": {
                             content: '""',
-                            position: 'absolute',
-                            bottom: '10px',
-                            left: '10px',
-                            width: '60px',
-                            height: '60px',
-                            borderLeft: `2px solid ${alpha(theme.palette.secondary.main, 0.4)}`,
-                            borderBottom: `2px solid ${alpha(theme.palette.secondary.main, 0.4)}`,
-                            borderRadius: '0 0 0 12px',
-                            opacity: 0.8
-                          }
+                            position: "absolute",
+                            bottom: "10px",
+                            left: "10px",
+                            width: "60px",
+                            height: "60px",
+                            borderLeft: `2px solid ${alpha(
+                              theme.palette.secondary.main,
+                              0.4
+                            )}`,
+                            borderBottom: `2px solid ${alpha(
+                              theme.palette.secondary.main,
+                              0.4
+                            )}`,
+                            borderRadius: "0 0 0 12px",
+                            opacity: 0.8,
+                          },
                         }}
                       >
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                          <Typography variant="h6" color="primary" 
-                            sx={{ 
-                              display: 'flex',
-                              alignItems: 'center',
-                              '& svg': {
-                                mr: 1
-                              }
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            mb: 2,
+                          }}
+                        >
+                          <Typography
+                            variant="h6"
+                            color="primary"
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              "& svg": {
+                                mr: 1,
+                              },
                             }}
                           >
                             <EqualizerIcon />
                             Generated Script
                           </Typography>
                           <Box>
-                            <motion.div className="icon-button-wrapper" style={{ display: 'inline-block' }}
+                            <motion.div
+                              className="icon-button-wrapper"
+                              style={{ display: "inline-block" }}
                               whileHover={{ rotate: 10, scale: 1.1 }}
                               whileTap={{ rotate: 0, scale: 0.9 }}
                             >
                               <Tooltip title="Copy Script">
-                                <IconButton onClick={handleCopyScript} color="primary">
+                                <IconButton
+                                  onClick={handleCopyScript}
+                                  color="primary"
+                                >
                                   <ContentCopyIcon />
                                 </IconButton>
                               </Tooltip>
                             </motion.div>
-                            <motion.div className="icon-button-wrapper" style={{ display: 'inline-block' }}
+                            <motion.div
+                              className="icon-button-wrapper"
+                              style={{ display: "inline-block" }}
                               whileHover={{ rotate: -10, scale: 1.1 }}
                               whileTap={{ rotate: 0, scale: 0.9 }}
                             >
                               <Tooltip title="Regenerate">
-                                <IconButton onClick={handleRegenerate} color="primary">
+                                <IconButton
+                                  onClick={handleRegenerate}
+                                  color="primary"
+                                >
                                   <RefreshIcon />
                                 </IconButton>
                               </Tooltip>
                             </motion.div>
-                            {(audioUrls.narrator || audioUrls.host || audioUrls.guest) && (
-                              <motion.div className="icon-button-wrapper" style={{ display: 'inline-block' }}
+                            {/* Generate Audio Button */}
+                            <motion.div
+                              className="icon-button-wrapper"
+                              style={{ display: "inline-block" }}
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                            >
+                              <Tooltip
+                                title={
+                                  audioLoading
+                                    ? "Generating Audio..."
+                                    : "Generate Audio"
+                                }
+                              >
+                                <IconButton
+                                  onClick={generateAudio}
+                                  color="secondary"
+                                  disabled={audioLoading || !script}
+                                >
+                                  {audioLoading ? (
+                                    <CircularProgress size={24} />
+                                  ) : (
+                                    <VolumeUpIcon />
+                                  )}
+                                </IconButton>
+                              </Tooltip>
+                            </motion.div>
+                            {/* Play All Button */}
+                            {(audioUrls.narrator ||
+                              audioUrls.host ||
+                              audioUrls.guest) && (
+                              <motion.div
+                                className="icon-button-wrapper"
+                                style={{ display: "inline-block" }}
                                 whileHover={{ scale: 1.1 }}
                                 whileTap={{ scale: 0.9 }}
                                 initial={{ scale: 1 }}
-                                animate={{ 
+                                animate={{
                                   scale: [1, 1.1, 1],
-                                  transition: { 
-                                    repeat: Infinity, 
-                                    repeatType: "reverse", 
-                                    duration: 2
-                                  }
+                                  transition: {
+                                    repeat: Infinity,
+                                    repeatType: "reverse",
+                                    duration: 2,
+                                  },
                                 }}
                               >
                                 <Tooltip title="Play All Voices in Sequence">
-                                  <IconButton 
+                                  <IconButton
                                     onClick={handlePlayBySection}
                                     color="secondary"
                                   >
@@ -944,79 +1226,81 @@ function App() {
                             )}
                           </Box>
                         </Box>
-                        
-                        <Box sx={{ 
-                          borderBottom: 1, 
-                          borderColor: 'divider', 
-                          mb: 2,
-                          position: 'relative',
-                          '&:after': {
-                            content: '""',
-                            position: 'absolute',
-                            bottom: 0,
-                            left: 0,
-                            width: '100%',
-                            height: '1px',
-                            background: `linear-gradient(90deg, ${theme.palette.primary.main}, transparent)`
-                          }
-                        }}>
-                          <Tabs 
-                            value={currentTab} 
-                            onChange={handleTabChange} 
+
+                        <Box
+                          sx={{
+                            borderBottom: 1,
+                            borderColor: "divider",
+                            mb: 2,
+                            position: "relative",
+                            "&:after": {
+                              content: '""',
+                              position: "absolute",
+                              bottom: 0,
+                              left: 0,
+                              width: "100%",
+                              height: "1px",
+                              background: `linear-gradient(90deg, ${theme.palette.primary.main}, transparent)`,
+                            },
+                          }}
+                        >
+                          <Tabs
+                            value={currentTab}
+                            onChange={handleTabChange}
                             aria-label="script tabs"
                             TabIndicatorProps={{
                               style: {
-                                height: '3px',
-                                borderRadius: '3px 3px 0 0'
-                              }
+                                height: "3px",
+                                borderRadius: "3px 3px 0 0",
+                              },
                             }}
                           >
-                            <Tab 
-                              label="Full Script" 
+                            <Tab
+                              label="Full Script"
                               sx={{
-                                transition: 'all 0.3s',
-                                '&.Mui-selected': {
-                                  fontWeight: 'bold',
-                                  transform: 'scale(1.05)'
-                                }
+                                transition: "all 0.3s",
+                                "&.Mui-selected": {
+                                  fontWeight: "bold",
+                                  transform: "scale(1.05)",
+                                },
                               }}
                             />
-                            <Tab 
-                              label="Narrator" 
+                            <Tab
+                              label="Narrator"
                               disabled={!scriptParts.narrator}
                               sx={{
-                                transition: 'all 0.3s',
-                                '&.Mui-selected': {
-                                  fontWeight: 'bold',
-                                  transform: 'scale(1.05)'
-                                }
+                                transition: "all 0.3s",
+                                "&.Mui-selected": {
+                                  fontWeight: "bold",
+                                  transform: "scale(1.05)",
+                                },
                               }}
                             />
-                            <Tab 
-                              label="Host" 
+                            <Tab
+                              label="Host"
                               disabled={!scriptParts.host}
                               sx={{
-                                transition: 'all 0.3s',
-                                '&.Mui-selected': {
-                                  fontWeight: 'bold',
-                                  transform: 'scale(1.05)'
-                                }
+                                transition: "all 0.3s",
+                                "&.Mui-selected": {
+                                  fontWeight: "bold",
+                                  transform: "scale(1.05)",
+                                },
                               }}
                             />
-                            <Tab 
-                              label="Guest" 
+                            <Tab
+                              label="Guest"
                               disabled={!scriptParts.guest}
                               sx={{
-                                transition: 'all 0.3s',
-                                '&.Mui-selected': {
-                                  fontWeight: 'bold',
-                                  transform: 'scale(1.05)'
-                                }
+                                transition: "all 0.3s",
+                                "&.Mui-selected": {
+                                  fontWeight: "bold",
+                                  transform: "scale(1.05)",
+                                },
                               }}
                             />
                           </Tabs>
                         </Box>
-                        
+
                         <AnimatePresence mode="wait">
                           {currentTab === 0 && (
                             <motion.div
@@ -1026,19 +1310,19 @@ function App() {
                               exit={{ opacity: 0, y: -10 }}
                               transition={{ duration: 0.3 }}
                             >
-                              <Typography 
-                                variant="body1" 
-                                sx={{ 
-                                  whiteSpace: 'pre-wrap',
+                              <Typography
+                                variant="body1"
+                                sx={{
+                                  whiteSpace: "pre-wrap",
                                   lineHeight: 1.8,
-                                  color: 'text.secondary'
+                                  color: "text.secondary",
                                 }}
                               >
                                 {script}
                               </Typography>
                             </motion.div>
                           )}
-                          
+
                           {currentTab === 1 && scriptParts.narrator && (
                             <motion.div
                               key="narrator-script"
@@ -1048,67 +1332,104 @@ function App() {
                               transition={{ duration: 0.3 }}
                             >
                               <Box>
-                                <Box sx={{ 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  mb: 2,
-                                  background: alpha(theme.palette.primary.main, 0.05),
-                                  p: 1,
-                                  borderRadius: 1,
-                                  border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
-                                }}>
-                                  <RecordVoiceOverIcon sx={{ mr: 1, color: 'primary.main' }} />
-                                  <Typography variant="subtitle1" color="primary">Narrator</Typography>
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    mb: 2,
+                                    background: alpha(
+                                      theme.palette.primary.main,
+                                      0.05
+                                    ),
+                                    p: 1,
+                                    borderRadius: 1,
+                                    border: `1px solid ${alpha(
+                                      theme.palette.primary.main,
+                                      0.1
+                                    )}`,
+                                  }}
+                                >
+                                  <RecordVoiceOverIcon
+                                    sx={{ mr: 1, color: "primary.main" }}
+                                  />
+                                  <Typography
+                                    variant="subtitle1"
+                                    color="primary"
+                                  >
+                                    Narrator
+                                  </Typography>
                                   {audioUrls.narrator && (
-                                    <motion.div 
-                                      animate={{ 
-                                        scale: isPlaying.narrator ? [1, 1.1, 1] : 1 
+                                    <motion.div
+                                      animate={{
+                                        scale: isPlaying.narrator
+                                          ? [1, 1.1, 1]
+                                          : 1,
                                       }}
-                                      transition={{ 
-                                        repeat: isPlaying.narrator ? Infinity : 0, 
-                                        duration: 0.8 
+                                      transition={{
+                                        repeat: isPlaying.narrator
+                                          ? Infinity
+                                          : 0,
+                                        duration: 0.8,
                                       }}
                                     >
-                                      <IconButton 
-                                        onClick={() => handlePlayPause('narrator')} 
+                                      <IconButton
+                                        onClick={() =>
+                                          handlePlayPause("narrator")
+                                        }
                                         color="primary"
                                         size="small"
-                                        sx={{ 
+                                        sx={{
                                           ml: 2,
-                                          background: alpha(theme.palette.primary.main, 0.1),
-                                          '&:hover': {
-                                            background: alpha(theme.palette.primary.main, 0.2),
-                                          }
+                                          background: alpha(
+                                            theme.palette.primary.main,
+                                            0.1
+                                          ),
+                                          "&:hover": {
+                                            background: alpha(
+                                              theme.palette.primary.main,
+                                              0.2
+                                            ),
+                                          },
                                         }}
                                       >
-                                        {isPlaying.narrator ? <PauseIcon /> : <PlayArrowIcon />}
+                                        {isPlaying.narrator ? (
+                                          <PauseIcon />
+                                        ) : (
+                                          <PlayArrowIcon />
+                                        )}
                                       </IconButton>
                                     </motion.div>
                                   )}
                                 </Box>
-                                <Typography 
-                                  variant="body1" 
-                                  sx={{ 
-                                    whiteSpace: 'pre-wrap',
+                                <Typography
+                                  variant="body1"
+                                  sx={{
+                                    whiteSpace: "pre-wrap",
                                     lineHeight: 1.8,
-                                    color: 'text.secondary',
-                                    ml: 4
+                                    color: "text.secondary",
+                                    ml: 4,
                                   }}
                                 >
                                   {scriptParts.narrator}
-                                  {audioUrls.narrator && scriptParts.narrator.length > 700 && (
-                                    <Typography 
-                                      variant="caption" 
-                                      sx={{ display: 'block', mt: 1, color: 'warning.main' }}
-                                    >
-                                      Note: Audio has been truncated due to length limits. Full text shown above.
-                                    </Typography>
-                                  )}
+                                  {audioUrls.narrator &&
+                                    scriptParts.narrator.length > 700 && (
+                                      <Typography
+                                        variant="caption"
+                                        sx={{
+                                          display: "block",
+                                          mt: 1,
+                                          color: "warning.main",
+                                        }}
+                                      >
+                                        Note: Audio has been truncated due to
+                                        length limits. Full text shown above.
+                                      </Typography>
+                                    )}
                                 </Typography>
                               </Box>
                             </motion.div>
                           )}
-                          
+
                           {currentTab === 2 && scriptParts.host && (
                             <motion.div
                               key="host-script"
@@ -1118,67 +1439,98 @@ function App() {
                               transition={{ duration: 0.3 }}
                             >
                               <Box>
-                                <Box sx={{ 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  mb: 2,
-                                  background: alpha(theme.palette.info.main, 0.05),
-                                  p: 1,
-                                  borderRadius: 1,
-                                  border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`
-                                }}>
-                                  <PersonIcon sx={{ mr: 1, color: 'info.main' }} />
-                                  <Typography variant="subtitle1" color="info.main">Host</Typography>
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    mb: 2,
+                                    background: alpha(
+                                      theme.palette.info.main,
+                                      0.05
+                                    ),
+                                    p: 1,
+                                    borderRadius: 1,
+                                    border: `1px solid ${alpha(
+                                      theme.palette.info.main,
+                                      0.1
+                                    )}`,
+                                  }}
+                                >
+                                  <PersonIcon
+                                    sx={{ mr: 1, color: "info.main" }}
+                                  />
+                                  <Typography
+                                    variant="subtitle1"
+                                    color="info.main"
+                                  >
+                                    Host
+                                  </Typography>
                                   {audioUrls.host && (
-                                    <motion.div 
-                                      animate={{ 
-                                        scale: isPlaying.host ? [1, 1.1, 1] : 1 
+                                    <motion.div
+                                      animate={{
+                                        scale: isPlaying.host ? [1, 1.1, 1] : 1,
                                       }}
-                                      transition={{ 
-                                        repeat: isPlaying.host ? Infinity : 0, 
-                                        duration: 0.8 
+                                      transition={{
+                                        repeat: isPlaying.host ? Infinity : 0,
+                                        duration: 0.8,
                                       }}
                                     >
-                                      <IconButton 
-                                        onClick={() => handlePlayPause('host')} 
+                                      <IconButton
+                                        onClick={() => handlePlayPause("host")}
                                         color="info"
                                         size="small"
-                                        sx={{ 
+                                        sx={{
                                           ml: 2,
-                                          background: alpha(theme.palette.info.main, 0.1),
-                                          '&:hover': {
-                                            background: alpha(theme.palette.info.main, 0.2),
-                                          }
+                                          background: alpha(
+                                            theme.palette.info.main,
+                                            0.1
+                                          ),
+                                          "&:hover": {
+                                            background: alpha(
+                                              theme.palette.info.main,
+                                              0.2
+                                            ),
+                                          },
                                         }}
                                       >
-                                        {isPlaying.host ? <PauseIcon /> : <PlayArrowIcon />}
+                                        {isPlaying.host ? (
+                                          <PauseIcon />
+                                        ) : (
+                                          <PlayArrowIcon />
+                                        )}
                                       </IconButton>
                                     </motion.div>
                                   )}
                                 </Box>
-                                <Typography 
-                                  variant="body1" 
-                                  sx={{ 
-                                    whiteSpace: 'pre-wrap',
+                                <Typography
+                                  variant="body1"
+                                  sx={{
+                                    whiteSpace: "pre-wrap",
                                     lineHeight: 1.8,
-                                    color: 'text.secondary',
-                                    ml: 4
+                                    color: "text.secondary",
+                                    ml: 4,
                                   }}
                                 >
                                   {scriptParts.host}
-                                  {audioUrls.host && scriptParts.host.length > 700 && (
-                                    <Typography 
-                                      variant="caption" 
-                                      sx={{ display: 'block', mt: 1, color: 'warning.main' }}
-                                    >
-                                      Note: Audio has been truncated due to length limits. Full text shown above.
-                                    </Typography>
-                                  )}
+                                  {audioUrls.host &&
+                                    scriptParts.host.length > 700 && (
+                                      <Typography
+                                        variant="caption"
+                                        sx={{
+                                          display: "block",
+                                          mt: 1,
+                                          color: "warning.main",
+                                        }}
+                                      >
+                                        Note: Audio has been truncated due to
+                                        length limits. Full text shown above.
+                                      </Typography>
+                                    )}
                                 </Typography>
                               </Box>
                             </motion.div>
                           )}
-                          
+
                           {currentTab === 3 && scriptParts.guest && (
                             <motion.div
                               key="guest-script"
@@ -1188,91 +1540,124 @@ function App() {
                               transition={{ duration: 0.3 }}
                             >
                               <Box>
-                                <Box sx={{ 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  mb: 2,
-                                  background: alpha(theme.palette.secondary.main, 0.05),
-                                  p: 1,
-                                  borderRadius: 1,
-                                  border: `1px solid ${alpha(theme.palette.secondary.main, 0.1)}`
-                                }}>
-                                  <GroupsIcon sx={{ mr: 1, color: 'secondary.main' }} />
-                                  <Typography variant="subtitle1" color="secondary.main">Guest</Typography>
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    mb: 2,
+                                    background: alpha(
+                                      theme.palette.secondary.main,
+                                      0.05
+                                    ),
+                                    p: 1,
+                                    borderRadius: 1,
+                                    border: `1px solid ${alpha(
+                                      theme.palette.secondary.main,
+                                      0.1
+                                    )}`,
+                                  }}
+                                >
+                                  <GroupsIcon
+                                    sx={{ mr: 1, color: "secondary.main" }}
+                                  />
+                                  <Typography
+                                    variant="subtitle1"
+                                    color="secondary.main"
+                                  >
+                                    Guest
+                                  </Typography>
                                   {audioUrls.guest && (
-                                    <motion.div 
-                                      animate={{ 
-                                        scale: isPlaying.guest ? [1, 1.1, 1] : 1 
+                                    <motion.div
+                                      animate={{
+                                        scale: isPlaying.guest
+                                          ? [1, 1.1, 1]
+                                          : 1,
                                       }}
-                                      transition={{ 
-                                        repeat: isPlaying.guest ? Infinity : 0, 
-                                        duration: 0.8 
+                                      transition={{
+                                        repeat: isPlaying.guest ? Infinity : 0,
+                                        duration: 0.8,
                                       }}
                                     >
-                                      <IconButton 
-                                        onClick={() => handlePlayPause('guest')} 
+                                      <IconButton
+                                        onClick={() => handlePlayPause("guest")}
                                         color="secondary"
                                         size="small"
-                                        sx={{ 
+                                        sx={{
                                           ml: 2,
-                                          background: alpha(theme.palette.secondary.main, 0.1),
-                                          '&:hover': {
-                                            background: alpha(theme.palette.secondary.main, 0.2),
-                                          }
+                                          background: alpha(
+                                            theme.palette.secondary.main,
+                                            0.1
+                                          ),
+                                          "&:hover": {
+                                            background: alpha(
+                                              theme.palette.secondary.main,
+                                              0.2
+                                            ),
+                                          },
                                         }}
                                       >
-                                        {isPlaying.guest ? <PauseIcon /> : <PlayArrowIcon />}
+                                        {isPlaying.guest ? (
+                                          <PauseIcon />
+                                        ) : (
+                                          <PlayArrowIcon />
+                                        )}
                                       </IconButton>
                                     </motion.div>
                                   )}
                                 </Box>
-                                <Typography 
-                                  variant="body1" 
-                                  sx={{ 
-                                    whiteSpace: 'pre-wrap',
+                                <Typography
+                                  variant="body1"
+                                  sx={{
+                                    whiteSpace: "pre-wrap",
                                     lineHeight: 1.8,
-                                    color: 'text.secondary',
-                                    ml: 4
+                                    color: "text.secondary",
+                                    ml: 4,
                                   }}
                                 >
                                   {scriptParts.guest}
-                                  {audioUrls.guest && scriptParts.guest.length > 700 && (
-                                    <Typography 
-                                      variant="caption" 
-                                      sx={{ display: 'block', mt: 1, color: 'warning.main' }}
-                                    >
-                                      Note: Audio has been truncated due to length limits. Full text shown above.
-                                    </Typography>
-                                  )}
+                                  {audioUrls.guest &&
+                                    scriptParts.guest.length > 700 && (
+                                      <Typography
+                                        variant="caption"
+                                        sx={{
+                                          display: "block",
+                                          mt: 1,
+                                          color: "warning.main",
+                                        }}
+                                      >
+                                        Note: Audio has been truncated due to
+                                        length limits. Full text shown above.
+                                      </Typography>
+                                    )}
                                 </Typography>
                               </Box>
                             </motion.div>
                           )}
                         </AnimatePresence>
-                        
+
                         {/* Audio elements */}
                         {audioUrls.narrator && (
                           <audio
                             ref={narratorAudioRef}
                             src={audioUrls.narrator}
-                            onEnded={() => handleAudioEnded('narrator')}
-                            style={{ display: 'none' }}
+                            onEnded={() => handleAudioEnded("narrator")}
+                            style={{ display: "none" }}
                           />
                         )}
                         {audioUrls.host && (
                           <audio
                             ref={hostAudioRef}
                             src={audioUrls.host}
-                            onEnded={() => handleAudioEnded('host')}
-                            style={{ display: 'none' }}
+                            onEnded={() => handleAudioEnded("host")}
+                            style={{ display: "none" }}
                           />
                         )}
                         {audioUrls.guest && (
                           <audio
                             ref={guestAudioRef}
                             src={audioUrls.guest}
-                            onEnded={() => handleAudioEnded('guest')}
-                            style={{ display: 'none' }}
+                            onEnded={() => handleAudioEnded("guest")}
+                            style={{ display: "none" }}
                           />
                         )}
                       </Card>
@@ -1292,47 +1677,47 @@ function App() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               style={{
-                position: 'fixed',
+                position: "fixed",
                 top: 0,
                 left: 0,
                 right: 0,
                 bottom: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'rgba(0,0,0,0.7)',
-                backdropFilter: 'blur(4px)',
-                zIndex: 1000
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "rgba(0,0,0,0.7)",
+                backdropFilter: "blur(4px)",
+                zIndex: 1000,
               }}
             >
               <motion.div
-                animate={{ 
+                animate={{
                   scale: [1, 1.1, 1],
-                  rotate: [0, 180, 360]
+                  rotate: [0, 180, 360],
                 }}
-                transition={{ 
+                transition={{
                   duration: 2,
                   repeat: Infinity,
-                  ease: "easeInOut"
+                  ease: "easeInOut",
                 }}
               >
-                <CircularProgress 
-                  size={60} 
-                  thickness={4} 
-                  sx={{ 
-                    color: 'white',
-                    filter: 'drop-shadow(0 0 8px rgba(255,255,255,0.5))'
-                  }} 
+                <CircularProgress
+                  size={60}
+                  thickness={4}
+                  sx={{
+                    color: "white",
+                    filter: "drop-shadow(0 0 8px rgba(255,255,255,0.5))",
+                  }}
                 />
               </motion.div>
-              <Typography 
-                variant="h6" 
-                sx={{ 
-                  position: 'absolute', 
-                  color: 'white',
+              <Typography
+                variant="h6"
+                sx={{
+                  position: "absolute",
+                  color: "white",
                   mt: 12,
-                  fontWeight: 'medium',
-                  textShadow: '0 2px 4px rgba(0,0,0,0.5)'
+                  fontWeight: "medium",
+                  textShadow: "0 2px 4px rgba(0,0,0,0.5)",
                 }}
               >
                 Generating your podcast...
